@@ -1,8 +1,63 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-int main(){
+void sendMessage(int fd, const char *msg)
+{
+    int len = strlen(msg);
+    uint32_t netLen = htonl(len);
+    send(fd, &netLen, sizeof(netLen), 0);
+    if (send(fd, msg, len, 0) != len) {
+        fprintf(stderr, "send did not send all data\n");
+        exit(1);
+    }
+}
 
-    printf("Hello world! I'm the overseer");
-    return 0;
+int main(int argc, char *argv[])
+{
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        perror("socket()");
+        return 1;
+    }
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    if (inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) != 1) {
+        perror("inet_pton");
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(12345);
+
+    // connect
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        perror("connect()");
+        return 1;
+    }
+
+    // char *dataToSend = "1234";
+    // sendMessage(fd, dataToSend);
+    // char *dataToSend = "5678";
+    // sendMessage(fd, dataToSend);
+
+
+    for(int i = 1; i < argc; i++){
+        char *dataToSend = argv[i];
+        sendMessage(fd, dataToSend);
+    }
     
+
+    if (shutdown(fd, SHUT_RDWR) == -1) {
+        perror("shutdown()");
+        return 1;
+    }
+
+    close(fd);
 }
